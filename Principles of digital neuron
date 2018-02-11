@@ -1,0 +1,98 @@
+Principles of digital neuron
+
+Base Functionality
+	- a neuron should be able to do the usual processes of learning, forgetting,
+		modifying behavior, etc. without a network of neurons
+	- more complex and abstract functionality may arise naturally out of networks,
+		but neurons should be intelligent agents in and of themselves
+
+Timestep
+	- the TIMESTEP of the neuron is how often it runs calculations, collecting
+		inputs and determining whether it should activate or memorize
+	- if information is encoded in timesteps rather than absolute time values,
+		neural objects can be stretched and compressed more easily
+	- we might expect this function to be possible when looking anecdotally on
+		how time is experienced relatively by people
+
+Activation
+	- ACTIVATION defined as the act of a neuron doing its output 
+		(controling a system, signaling another neuron, etc.)
+	- activation comes from a mix of internal and external signals
+	- both types of signals can be inhibitory or excitatory (making activation less or more likely)
+	- activations could be probabilistic or deterministic
+		-> you might expect them to be probabilistic, then spontaneous unexpected signals could be generated, 
+			which looks a bit more like creativity
+	- the sum of activation signals is termed POTENTIAL
+
+Working Memory
+	- a neuron holds a record of a specified previous amount of time, labeled the WORKING MEMORY
+	- encoded is activation probability as well as actual activations
+
+Memories
+	- MEMORIES are fundamentally patterns of previous potential
+	- when activated, they exert influence on the potential
+	- memories are activated when a neuron experiences a potential pattern similar
+		to a pattern previously experienced
+	- we might expect that a memory could be activated from any spot in the memory
+		-> or interestingly, limiting to just the beginning of a memory and playing out 
+			its entirety will increase efficiency on the order of n^2, maybe without
+			decreasing effectiveness far too much
+	- we might also expect that a potential pattern that matches a memory but at a
+		different speed may also activate the memory
+		-> this could also be resolved by allowing modification of the timestep
+	- the process of encoding a memory is termed MEMORIZING
+	- Components:
+		- activation history
+		- potential history
+		- strength (how much the pattern contributes to potential)
+
+Memorizing
+	- memorizing may or may not be a function of activation
+	= need to consider when patterns should be memorized
+	- with more complex systems, you can have dedicated neurons that send
+		memorize signals (e.g. the cerebellum) and handle the aspect of expectation vs
+		reality
+
+Forgetting
+	- the process of weakening or even deleting memories is called FORGETTING
+	- can happen in a number of processes
+	- Over time:
+		- over time, memories may simply weaken
+		- this likely happens in an asymptotic process, although for practicality
+			we might define certain strength bounds to delete memories entirely
+	- Expectation vs reality:
+		- by encoding activation history, we can determine if the pattern is met
+			in reality
+		- this could also be used for potential history alone
+		= we'd have to see whether one is sufficient or both
+
+Consolidating Memories / Strengthening
+	- we note that some memories last nearly entire lifetimes, even when largely
+		unused over the course of a life. Similarly, old memories can resurface in
+		old age, as if these are deeper within the brain
+	- with a pruning process of forgetting, this might not be possible. Although
+		another explanation could be that there are deeper neurons which are 
+		remembering these patterns, but they do so weakly and by themselves. In the
+		old age example, after newer surface signals die down and weaken, then the
+		old signals can actually be perceived
+	- nonetheless, we may consider a process through which memories are strengthened
+		rather than forgotten, and whether this influences their robustness against
+		forgetting
+	- Being able to cocnsolidate memories would also be very helpful in improving
+		computation efficiency
+	- interestingly, you might consider a process of SLEEP, where neurons are
+		actually given time to adjust memories without external linfluence
+
+
+Memorizing (pt.2)
+	- when to memorize is essentially describing the goal of the neuron
+	- if we define it, then we are in conducting a form of supervised learning
+	- consider the single neuron system -> it doesn't have enough complexity
+		to determine goals on its own. The only goal setter can be evolution i.e.
+		fitness or survival. In other words, the neurons with incorrectly set goals
+		naturally dissapear
+	- in higher complexity systems, the goals can be defined and written by internal
+		systems
+	- maybe there is something in information theory that theorizes the amount
+		of information a single neuron can attempt to learn, and the complexity
+		needed to reach certain milestones of intelligence?
