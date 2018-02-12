@@ -23,6 +23,13 @@ Activation
 		-> you might expect them to be probabilistic, then spontaneous unexpected signals could be generated, 
 			which looks a bit more like creativity
 	- the sum of activation signals is termed POTENTIAL
+	- there are two ways to sum multiple input signals
+		1. increase the timestep of the neuron - however this simultaneously
+			decreases the potential fire rate of the neuron, and many other things
+			are governed by the timestep, so this may be troublesome. However, it
+			also decreases computation cost
+		2. introduce leak terms, so that summation can occur over multiple timesteps.
+			This is probably needed in general, even with longer timesteps
 
 Working Memory
 	- a neuron holds a record of a specified previous amount of time, labeled the WORKING MEMORY
@@ -96,3 +103,197 @@ Memorizing (pt.2)
 	- maybe there is something in information theory that theorizes the amount
 		of information a single neuron can attempt to learn, and the complexity
 		needed to reach certain milestones of intelligence?
+
+Complex Learning Goals
+	i.e. goals of complexity that should be able to emerge from deeper networks
+	- Learning transfer
+		-> A network should learn common game patterns that push it towards certain
+			rewards. This may entail a higher order system that learns what types of
+			rewards exist and how they are achieved
+	- Componentization/Compartmentalization
+		-> A network may develop distinct component parts with specific functions
+			that can be separated and attached or installed to imbue other networks
+			with that functionality
+		-> Example components: visualization core (abstracts visual information), 
+			mode switcher, rhythm generators, positive/negative feedback loops
+	- Pattern/Mode switching
+		-> A network should be able to remember different modes of behavior and
+			switch between them easily
+		-> Likely expect this to emerge from different rhythm generators or 
+			activation patterns
+		-> Thus in a changing environment, it should recognize the environment
+			settings and switch modes when the environment changes
+	- Network Progamming
+		-> At the highest level, we want to see networks that know how to program
+			other networks. This is essentially a step even above learning transfer
+			that the system learns how to learn
+	- Abstraction Principles
+		-> Again, fitting with network programming/learning transfer, a sufficiently
+			complex network should be able to abstract its own patterns and learn
+			from them at a high level
+
+Memorizing (Part 3)
+	- we have to explore not just when to memorize, but what to memorize as well
+	- at every moment, a neuron can be considered to be making a binary decision
+		to first or not. I.e., ACTIVATION or SUPPRESSION
+	- thought about this way, we can't decide a time to memorize based on the
+		neuron's decision to activate, because in essence, activation and
+		suppression are always happening. We can't differentiate between the two
+		in terms of decision making
+	- additionally, when considering -what- to memorize, perhaps it is not the
+		potential curve itself, but the activation decisions
+	- consider the following model
+		a) Neuron receives inputs, generating a potential function
+		b) Based on the input, the neuron decides whether to activate or suppress
+		c) At a certain point, it learns whether those past decisions were good
+			or bad to take
+		d) Memorized is a combination of the decisions, as well as the potential
+			function
+		e) The neuron uses the potential function to determine when to fire the 
+			memory, and the memory itself was the past decisions made
+	- memories are thus colored by a positive or negative outcome, and the
+		neuron takes into account the decision history of the memory based on
+		the outcome
+	- to define whether a memory is good or not, we need a COST FUNCTION (J or
+		deltaJ)
+	- additionally, the cost function comes into play on determining when to
+		memorize
+	- essentially, memorizing happens in response to deltaJ values
+		-> exactly when deltaJ values are calculated is a parameter in itself
+		-> deltaJ could be another rolling window that is at a different time length
+			then active memory
+		-> while it seems like it could be a lot to consider, I believe there are 
+			some fundamental limitations to the size of this that shrink the search
+			space (and the same for active memory length and timestep length)
+
+Timestep/Active memory/DeltaJ window limitations
+	- there should be a limitation on the number of steps able to be held in
+		active memory at any given time - this is the -actual amount of information-
+		held in active memory
+	- notably, this means that number of steps should hover around a constant,
+		while active memory length and timestep are correlated
+		-> i.e. active memory length = (C) number of steps * timestep
+	- this is likely related to cell size limitations in nature
+	- this means that in considering these parameters, only one really has to be
+		changed, active memory length -or- timestep. However, we don't know the
+		step limitation yet, but once that is figured out parameter search becomes
+		easier
+	- hypothetically, this would mean that you could have an indefinite active
+		memory length by arbitrarily increasing the timestep length
+	- however, this presents two natural limitations
+		1. for a timestep that is too slow, the neuron is no longer responsive
+			enough to the environment to be useful
+		2. a timestep or active memory window that is too much longer/different to
+			other neurons in the network would cause inaccurate information 
+			propogation, or simply an inability to communicate effectively
+	- thus there should be a natural window in which effective timesteps exist,
+		decreasing the parameter search space of neurons
+	- similar natural limitations should exist for deltaJ windows, where there is
+		a length around which they are maximally effective and responsive
+	- my initial guess would be to use the working memory length of humans as a
+		starting point (10-15 seconds), and a deltaJ window around which we might
+		intuitively expect feedback to be received (1-5 seconds)
+		-> interestingly, this would suggest that immediacy of feedback has a very
+			strong fall off with time
+		-> in addition, longer thinking times, e.g. short-term memory, would require
+			neurons that loop themselves in active memory to hold information, and 
+			specialized neurons that store huge numbers of patterns for long-term 
+			memory, interspersed throughout the brain system that generate patterns
+			initiating long-term memories
+
+Cost Function
+	- a neuron can take on multiple different cost functions, depending on its
+		goals
+	- this is another key difference with NNs, they use a single cost function
+		and propogate throughout the system, whereas with the digital neuron, every
+		neuron is responsible for its own cost function
+	- simple ones are to minimize or maximize output
+	- complex ones may even be able to surpass those naturally available, for
+		example, a cost function to synchronize the inputs would need to 
+		differentiate between different inputs (which is not currently possible
+		in our system)
+
+Learning Algorithm
+	- based on the comments in Memorizing (Part 3), I propose the following
+		learning algorithm:
+		1) a neuron starts with essentially random activation/suppression (a/s)
+			a. the degree of conservativeness for a neuron is a parameter
+			b. the decision plot should be probabilistic
+		2) at every time step, the neuron records/calculates three values
+			a. records the input potential
+			b. records the a/s decision (as binary, not probabilistic, even though
+				the actual decision making is probabilistic)
+			c. calculates deltaJ using a window of the previous input potential
+				(this algorithm needs to be better defined)
+		3) when deltaJ reaches past a certain threshold, the neuron memorizes its
+			active memory as a pattern, encoding all of a., b., and c.
+			a. the strength of these early memories should be weak, allowing for
+				exploration of more optimized strategies
+		4) when the neuron sees input patterns matching those recorded in a memory,
+			it matches along its previous decision pattern (colored by the deltaJ of
+			the memory), and uses this to affect its current decision pattern
+			a. the affectation while encoded as binary, should affect the probability
+				of activation
+			b. i.e. Memories: binary, Decision Making: probabilistic, 
+				Actual Decision: binary
+		5) the process continues, encoding memories and patterns
+	- at first, the decision plot looks very chaotic. Over time, the neuron learns
+		good and bad patterns in response to the input potential and the noise of
+		its decision pattern decreases and stabilizes
+	- when the neuron experiences an unknown input pattern, it has less guidance
+		from memories, so experiments again with noisy decisions
+
+	- AMENDMENT: the b. recorded in a memory should actually be the -certainty-
+		the a decision should be taken. It should not record the binary output
+		-> this certainty of the decision then gets used in the calculation of
+			future decisions based on the memory
+		-> less certain decisions confer less weight to that portion of the memory
+		-> in turn, this allows the neuron to spend more time exploring the spaces
+			where it is unsure of decisions, and less variation on the areas where it
+			is quite certain of what to do
+
+=> algorithms that need better refinement
+	- deltaJ window/cost function calculation
+	- how to match patterns in memories
+
+Sleep
+	- I believe that SLEEP arises naturally as a result of the learning
+		algorithm, even in a single neuron system, as a way to refine the patterns
+		learned
+	- at first, the learning algorithm will learn a lot of nonsensical patterns -
+		these need to be cleaned out
+	- additionally, over too much time, the number of memories collected will be
+		tough to match against, and decrease neuron performance
+	- sleep thus initiates a chance for the neuron to prune non useful memories,
+		and strengthen those that appear often
+	- good memories to strengthen are those where all three parameters (input 
+		pattern, decision pattern, deltaJ value) match. If these appear over and
+		over, they can be consolidated
+		-> additionally, memories where portions of patterns match and other 
+			portions don't, the non-matching can be smoothed out (maybe some gaussian
+			averaging) and the matching strengthened. I.e. interference patterns
+	- unuseful memories are those that don't appear very often, or are very
+		different or even opposite to others
+	- thus after a period of "sleep", the neuron operates at higher efficiency,
+		with less noise/jitter, more confident in its actions, responding more
+		correctly to recognized environments
+	- this can happen algorithmically, or interestingly, it can happen in a 
+		"biological" fashion too, i.e. using the same learning algorithm defined
+		prior
+	- by blocking out external stimuli (like real biological sleep), the neuron
+		can instead play back patterns internally, letting memory patterns that
+		dominate replay over and over, strengthening them, and letting weaker
+		memories die off simply through natural forgetting processes
+		-> it is harder to conceive that the "biological" method could occur in
+			less complex systems. You would need a neural component that records
+			patterns as is during wakefulness simply for the purpose of simulation
+		-> this fits vaguely with our human experience of dreams, which seem to
+			replay somewhat the events of the day (primarily perhaps at the emotional
+			level, which is likely where sleep began to evolve as a more defined 
+			and critical process for more complex behaviors and faster learning)
+	- in the digital/algorithmic method, we can actually outsource the process
+		of sleep to other threads, which is pretty interesting, though perhaps not
+		necessarily a good thing
+	- a consequence of this sleep algorithm would be that bad habits are enforced
+		as easily as good ones. The memories that are consolidated are the ones 
+		that match up the most/are the most consistent
