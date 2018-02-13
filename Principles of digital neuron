@@ -131,6 +131,9 @@ Complex Learning Goals
 		-> Again, fitting with network programming/learning transfer, a sufficiently
 			complex network should be able to abstract its own patterns and learn
 			from them at a high level
+	- Prediction
+		-> This is very high in complexity, and requires internal pattern generators
+			and simulator compartments
 
 Memorizing (Part 3)
 	- we have to explore not just when to memorize, but what to memorize as well
@@ -297,3 +300,18 @@ Sleep
 	- a consequence of this sleep algorithm would be that bad habits are enforced
 		as easily as good ones. The memories that are consolidated are the ones 
 		that match up the most/are the most consistent
+
+Memory Matching Algorithm
+	- it turns out this algorithm may likely be computationally very cheap
+	- because all memories carry the same time step format as the input potential,
+		all you have to do is take difference of the last n steps of input potential
+		and the first n steps of any memory, and the sum of that the absolute
+		values of the differences gives the similarity of the values
+	- matching is based on a threshold of similarity (the sum difference)
+	- actually proably more effective is use the square, to get distance
+	- when matched, we can use ANNEALING, as in laying the memory over the active
+		memory and exerting its influence through the remaining timesteps
+		-> this suggests that the first n steps used to match actually exert no
+			influence on the active memory, so in a more efficient environment we
+			could even choose not to record the certainty memory of those timesteps
+		-> you also wouldn't need the rest of steps > n for potential

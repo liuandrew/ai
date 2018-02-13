@@ -190,7 +190,6 @@ class Game:
 			self.player.inflate(False)
 
 		# neural input
-		print(self.neuron_state)
 		self.player.inflate(self.neuron_state)
 
 		if(pressed[pygame.K_ESCAPE]):
@@ -256,14 +255,14 @@ class Game:
 class GameEnvironment:
 	def __init__(self):
 		self.game = Game(self.environment_loop)
-		self.neuron = Neuron(timestep=0.02, active_memory_length=4.0, name="player",
+		self.neuron = Neuron(timestep=0.10, active_memory_length=4.0, name="player",
 			plot_potential=False, activate=self.game_neuron)
-		self.neuron.init_potential_graph()
+		# self.neuron.init_potential_graph()
 		self.neuron.start()
 
 	def environment_loop(self):
 		self.neuron.receive_input(self.game.outputs['proximity'])
-		self.neuron.animate_potential()
+		# self.neuron.animate_potential()
 
 	def game_neuron(self, activated):
 		'''
