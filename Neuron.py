@@ -44,7 +44,7 @@ class Neuron:
   def __init__(self, timestep=1.0, active_memory_length=10.0, name='neuron',
       plot_potential=False, activate=None, activate_threshold=0.5,
       cost_function_window=1.0, delta_cost_threshold=5.0, base_certainty=0.001,
-      annealing_steps=10, annealing_threshold=1.0):
+      annealing_steps=10, annealing_threshold=5.0):
     '''
     Construct a new Neuron
     :param timestep: float, optional (default=1.0)
@@ -92,6 +92,7 @@ class Neuron:
     self.base_certainty = base_certainty
     self.annealing_steps = annealing_steps
     self.annealing_threshold = annealing_threshold
+    self.annealed_memories = None    
 
     self.stopFlag = threading.Event()
     self.clock = Clock(timestep, self.stopFlag, self.step)
@@ -170,11 +171,13 @@ class Neuron:
       index 0: (np.array) active_memory -> used for pattern matching
       index 1: (np.array) certainty_memory -> used for adjusting certainty
       index 2: (int) deltaJ -> scaling certainty
+      index 3: (boolean) is_annealed -> memories are not annealed by default
     '''
     memory = np.array([
-      self.active_memory,
-      self.certainty_memory + self.base_certainty,
-      deltaj
+      self.active_memory[-(2*self.cost_function_steps):],
+      self.certainty_memory[-(2*self.cost_function_steps):] + self.base_certainty,
+      deltaj,
+      False
     ])
     if(self.memories is None):
       self.memories = np.array([memory])
@@ -196,11 +199,23 @@ class Neuron:
     # ---------------------
     activate_threshold = self.activate_threshold
     # Add in influence from memories
-    # activation_threshold += sum_of_memories
-    # Calculate difference - this might be independent of base threshold?
-    #   in which case self.activatae_threshold is not part of the eq.
-    #   just alpha * sum_of_memories
-    # activation_certainty = alpha * (self.activate_threshold - activate_threshold)
+    activation_certainty = 0
+    # sum influences while popping them
+    if(self.annealed_memories is not None):
+      for (index, annealed) in np.ndenumerate(self.annealed_memories[:,0]):
+        activation_certainty += annealed[0]
+        self.annealed_memories[index[0]][0] = self.annealed_memories[index[0]][0][1:]
+        # annealing is completed, remove and unmark annealed
+        if(self.annealed_memories[index[0]][0].size == 0):
+          # index[0] entry 1 stores the memory index[0], set this to not annealed
+          self.memories[self.annealed_memories[index[0]][1]][3] = False
+          self.annealed_memories = np.delete(self.annealed_memories, index[0], 0)
+
+          # # clear 
+          # if(self.annealed_memories.size == 0):
+          #   self.annealed_memories = None
+
+    activate_threshold += activation_certainty
     activated = False
     if(random() > activate_threshold):
       activated = True
@@ -209,9 +224,6 @@ class Neuron:
     else:
       if(callable(self.activate)):
         self.activate(False)
-
-    # temp
-    activation_certainty = 0
 
     return activation_certainty
     # return activated
@@ -223,14 +235,52 @@ class Neuron:
     '''
     if(self.memories is None):
       return
-      
-    
-    # # iterate through the potential of each memory
+          
+    highest_certainty = 0
+    highest_certainty_index = None
+    # iterate through the potential of each memory, use the highest certainty
     for (index, memory) in np.ndenumerate(self.memories[:, 0]):
       if(np.sum(np.power(
-        memory[0:self.annealing_steps] - self.active_memory[-self.annealing_steps:],
+        # waldo -> annealing_steps not used
+        memory[0:self.cost_function_steps] - self.active_memory[-self.cost_function_steps:],
         2)) < self.annealing_threshold):
-        print('ready to anneal memory #{}'.format(index))
+        certainty = self.get_memory_certainty(index[0])
+        if(not self.is_annealed(index[0]) and certainty > highest_certainty):
+          highest_certainty = certainty
+          highest_certainty_index = index[0]
+
+    if(highest_certainty_index is not None):
+      logging.debug('certainty of annealed memory: {}'.format(certainty))
+      self.anneal_memory(highest_certainty_index)
+
+  def get_memory_certainty(self, index):
+    '''
+    Calculate the sum certainty of a memory
+    '''
+    memory = self.memories[index]
+    return np.sum(np.abs(memory[1] * memory[2]))
+
+  def is_annealed(self, index):
+    '''
+    Return if a memory is currently annealed (should not be multi-annealed)
+    '''
+    return self.memories[index][3]
+
+  def anneal_memory(self, index):
+    '''
+    Anneal a memory to the active stream
+    '''
+    logging.debug('annealing memory {}'.format(index))
+    memory = self.memories[index]
+    self.memories[index][3] = True
+    annealing_memory = np.array(
+      [memory[1][-self.cost_function_steps:] * memory[2], index])
+
+    if(self.annealed_memories is None):
+      # create certainty of this memory and directionality
+      self.annealed_memories = np.array([annealing_memory])
+    else:
+      np.vstack((self.annealed_memories, annealing_memory))
 
   def start(self):
     self.clock.start()
