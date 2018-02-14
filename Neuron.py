@@ -43,8 +43,8 @@ class Neuron:
   # may be best to do every one scaled in terms of timestep
   def __init__(self, timestep=1.0, active_memory_length=10.0, name='neuron',
       plot_potential=False, activate=None, activate_threshold=0.5,
-      cost_function_window=1.0, delta_cost_threshold=5.0, base_certainty=0.001,
-      annealing_steps=10, annealing_threshold=5.0):
+      cost_function_window=1.0, delta_cost_threshold=5.0, base_certainty=0.0001,
+      annealing_steps=5, annealing_threshold=5.0):
     '''
     Construct a new Neuron
     :param timestep: float, optional (default=1.0)
@@ -101,6 +101,10 @@ class Neuron:
     self.plot_potential = plot_potential
     if(self.plot_potential):
       self.init_potential_graph()
+
+    # used to calculate rolling cost function -> should converge over time
+    self.total_cost = 0
+    self.total_cost_steps = 0
     
   def calculate(self):
     pass
@@ -148,6 +152,10 @@ class Neuron:
     '''
     For every n = self.cost_function_steps steps, calculate the last n steps of
     cost function and compare to the last [2n, n] steps of cost function
+    minimize: j2 - j1 negative is a decrease in cost, this is positive influence
+      on actions taken
+    maximize: j2 - j1 positive is an increase in cost, this is positive on
+      actions taken
     '''
     cost_function = 'minimize'
 
@@ -159,9 +167,19 @@ class Neuron:
       j1 = self.active_memory[-steps:]
       j2 = self.active_memory[-(2 * steps):-steps]
       deltaj = np.sum(j2) - np.sum(j1)
+
+      if(cost_function is 'minimize'):
+        deltaj = -deltaj
+      if(cost_function is 'maximize'):
+        pass
       logging.debug('deltaj: {}'.format(deltaj))
       if(abs(deltaj) > self.delta_cost_threshold):
         self.memorize(deltaj)
+      # monitor total cost
+      self.total_cost += np.sum(j1)
+      self.total_cost_steps += 1
+      logging.debug('total average cost: {}'.format(
+        self.total_cost / self.total_cost_steps))
 
   def memorize(self, deltaj):
     '''
@@ -200,6 +218,8 @@ class Neuron:
     activate_threshold = self.activate_threshold
     # Add in influence from memories
     activation_certainty = 0
+    # record anenaled memories indecies to be cleared
+    indecies_to_be_cleared = []
     # sum influences while popping them
     if(self.annealed_memories is not None):
       for (index, annealed) in np.ndenumerate(self.annealed_memories[:,0]):
@@ -209,11 +229,18 @@ class Neuron:
         if(self.annealed_memories[index[0]][0].size == 0):
           # index[0] entry 1 stores the memory index[0], set this to not annealed
           self.memories[self.annealed_memories[index[0]][1]][3] = False
-          self.annealed_memories = np.delete(self.annealed_memories, index[0], 0)
 
-          # # clear 
-          # if(self.annealed_memories.size == 0):
-          #   self.annealed_memories = None
+          indecies_to_be_cleared.append(index)
+          # clear 
+          if(self.annealed_memories.size == 0):
+            self.annealed_memories = None
+
+    # clear out any annealed memories that have terminated
+    indecies_to_be_cleared.reverse()
+    for i in indecies_to_be_cleared:
+      self.annealed_memories = np.delete(self.annealed_memories, i, 0)
+      if(self.annealed_memories.size == 0):
+        self.annealed_memories = None
 
     activate_threshold += activation_certainty
     activated = False
@@ -242,7 +269,7 @@ class Neuron:
     for (index, memory) in np.ndenumerate(self.memories[:, 0]):
       if(np.sum(np.power(
         # waldo -> annealing_steps not used
-        memory[0:self.cost_function_steps] - self.active_memory[-self.cost_function_steps:],
+        memory[0:self.annealing_steps] - self.active_memory[-self.annealing_steps:],
         2)) < self.annealing_threshold):
         certainty = self.get_memory_certainty(index[0])
         if(not self.is_annealed(index[0]) and certainty > highest_certainty):
@@ -270,7 +297,7 @@ class Neuron:
     '''
     Anneal a memory to the active stream
     '''
-    logging.debug('annealing memory {}'.format(index))
+    # logging.debug('annealing memory {}'.format(index))
     memory = self.memories[index]
     self.memories[index][3] = True
     annealing_memory = np.array(
@@ -280,7 +307,7 @@ class Neuron:
       # create certainty of this memory and directionality
       self.annealed_memories = np.array([annealing_memory])
     else:
-      np.vstack((self.annealed_memories, annealing_memory))
+      self.annealed_memories = np.vstack((self.annealed_memories, annealing_memory))
 
   def start(self):
     self.clock.start()
