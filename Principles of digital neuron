@@ -315,3 +315,40 @@ Memory Matching Algorithm
 			influence on the active memory, so in a more efficient environment we
 			could even choose not to record the certainty memory of those timesteps
 		-> you also wouldn't need the rest of steps > n for potential
+
+Sensitizing/Desensitizing
+	- while running the neuron learning, I noticed that when the deltaJ is very
+		large, the neuron learns confidence levels that are much greater than 1
+	- ideally, you want everything in the neuron to ultimately scale to values
+		between -1 and 1, otherwise the neuron has the potential of blowing up out
+		of scale and never returning to a modify-able level
+	- can consider it in terms of divergent/convergent series or diff eqs. Keeping
+		values in [-1, 1] prevent the progression from diverging
+	- there are multiple points we can adjust sensitivity from. The easiest is
+		probably to evaluate sensitivity at every deltaJ interval, but then it is
+		hard to tell when you have a temporarily small deltaJ versus a changed
+		input range
+	- considering a biological analog, there are limits to the range of
+		sensitivity, and different neurons are responsible for different ranges
+	- generally speaking, desensitizing should be rapid while sensitizing should
+		be quite gradual
+	- it is quite easy to translate a deltaJ sensitivity algorithm to a timestep
+		input potential sensitivity algorithm by simply dividing the desired
+		deltaJ sensitivity level by the timesteps in a deltaJ interval, and matching
+		individual steps to that amount
+	- sensitizing speed should be a parameter, desensitizing can happen more or
+		less instantaneously when a signal fires outside of sensitivity, and should
+		be capped at 1
+	= another interesting prediction by this system is that we should have
+		difficulties forming memories moments after a stimulus that we have to
+		desensitize to because they are incomparable to the input received at
+		regular sensitivity levels (or that these memories are more easy to recall
+		when similar desensitizing events occur, but this would be hard to
+		reproduce accurately)
+
+Penalizing
+	- you could consider adding a penalty term to activations which factors into
+		the cost function for activations
+	- this is sort of embodied within the activation threshold to begin with though
+	- what's more, this is something that should absolutely arise naturally out of
+		higher complexity systems, so I won't worry about it
