@@ -35,7 +35,6 @@ class Clock(threading.Thread):
     '''
     while not self.stopped.wait(self.timestep):
       self.target()
-#    pass
 
 #%%
 class Neuron:
@@ -43,8 +42,9 @@ class Neuron:
   # may be best to do every one scaled in terms of timestep
   def __init__(self, timestep=1.0, active_memory_length=10.0, name='neuron',
       plot_potential=False, activate=None, activate_threshold=0.5,
-      cost_function_window=1.0, delta_cost_threshold=5.0, base_certainty=0.0001,
-      annealing_steps=5, annealing_threshold=5.0):
+      cost_function_window=1.0, delta_cost_threshold=0.7, base_certainty=0.0001,
+      annealing_steps=5, annealing_threshold=0.05, sensitizing_threshold=0.7,
+      sensitizing_rate=0.02):
     '''
     Construct a new Neuron
     :param timestep: float, optional (default=1.0)
@@ -63,7 +63,7 @@ class Neuron:
       The length of window by which cost function is calculated
       This is related to how long in the future the neuron would like to
         see if its actions had an impact on (maybe)
-    :param delta_cost_threshold: float optional (default = 5.0)
+    :param delta_cost_threshold: float optional (default = 0.7)
       The amount of cost change needed to trigger memorization
     :param base_certainty: float optional (default = 0.001)
       The base certainty applied to each memory, i.e. how quickly the neuron
@@ -72,17 +72,25 @@ class Neuron:
       The number of time steps that memories should be compared to and annealed
       This may be better represented as a decimal of total steps in active
         memory
-    :param annealing_threshold: float, optional (default = 1.0)
+    :param annealing_threshold: float, optional (default = 0.05)
       Threshold of distance below which a memory should be considered a match to
       anneal
+    :param sensitizing_threshold: float, optional (default = 0.7)
+      Threshold below which the neuron will sensitize itself
+    :param sensitizing_rate: float, optional (default = 0.02)
+      The maximum rate at which the neuron will sensitize itself, as a fraction
+      of current sensitivity
     '''
+    # neuron state variables
     self.memories = None
     self.active_memory = np.array([])
     self.certainty_memory = np.array([])
+    self.input_potential = 0
+    self.sensitivity = 1.0
+
+    # neuron parameters
     self.active_memory_length = active_memory_length
     self.active_memory_steps = int(active_memory_length / timestep)
-    self.input_potential = 0
-    
     self.activate = activate
     self.activate_threshold = activate_threshold
     self.cost_function_window = cost_function_window
@@ -92,8 +100,11 @@ class Neuron:
     self.base_certainty = base_certainty
     self.annealing_steps = annealing_steps
     self.annealing_threshold = annealing_threshold
-    self.annealed_memories = None    
+    self.annealed_memories = None
+    self.sensitizing_rate = sensitizing_rate
+    self.sensitizing_threshold = sensitizing_threshold
 
+    # internal clock
     self.stopFlag = threading.Event()
     self.clock = Clock(timestep, self.stopFlag, self.step)
     self.clock.setName(name)
@@ -118,7 +129,11 @@ class Neuron:
       - Update active memory
     '''
     # logging.debug('input_potential: {}'.format(self.input_potential))
-    self.active_memory = np.append(self.active_memory, self.input_potential)
+    # logging.debug('sensitivity: {}'.format(self.sensitivity))
+    # logging.debug('sensitized potential: {}'.format(self.input_potential * self.sensitivity))
+
+    self.active_memory = np.append(self.active_memory, 
+      self.input_potential * self.sensitivity)
     if(self.active_memory.size > self.active_memory_steps):
       self.active_memory = self.active_memory[1:]
 
@@ -146,7 +161,7 @@ class Neuron:
 
     if(self.plot_potential):
       self.animate_potential()
-  
+
 
   def calculate_cost_function(self):
     '''
@@ -168,18 +183,46 @@ class Neuron:
       j2 = self.active_memory[-(2 * steps):-steps]
       deltaj = np.sum(j2) - np.sum(j1)
 
+      j1_sum = np.sum(j1)
+      logging.debug(j1_sum)
+      # desensitize if j1_sum exceeds 1.0
+      if(j1_sum > 1.0):
+        self.sensitivity = self.sensitivity * (1.0 / j1_sum)
+        # calibrate deltaj against new sensitivity
+        deltaj = deltaj / j1_sum
+
+      # sensitize if j1_sum is below sensitizing threshold
+      if(j1_sum < self.sensitizing_threshold):
+        # sensitize up to at maximum the threshold
+        if((not j1_sum == 0) and 
+          ((self.sensitizing_threshold / j1_sum) < self.sensitizing_rate)):
+          self.sensitivity = self.sensitivity * (self.sensitizing_threshold / j1_sum)
+        # or up to the sensitizing_rate
+        else:
+          self.sensitivity = self.sensitivity * (1 + self.sensitizing_rate)
+
       if(cost_function is 'minimize'):
         deltaj = -deltaj
       if(cost_function is 'maximize'):
         pass
-      logging.debug('deltaj: {}'.format(deltaj))
       if(abs(deltaj) > self.delta_cost_threshold):
         self.memorize(deltaj)
+
+      # --------------------
+      # Diagnostics
+      # --------------------
+      # Memory Saving
+      np.save('memories', self.memories)
+      np.save('annealed_memories', self.annealed_memories)
+
+      # Cost and Sensitivity Logging
+      # logging.debug('deltaj: {}'.format(deltaj))
+      # logging.debug('sensitivity: {}'.format(self.sensitivity))
       # monitor total cost
-      self.total_cost += np.sum(j1)
-      self.total_cost_steps += 1
-      logging.debug('total average cost: {}'.format(
-        self.total_cost / self.total_cost_steps))
+      # self.total_cost += np.sum(j1)
+      # self.total_cost_steps += 1
+      # logging.debug('total average cost: {}'.format(
+      #   self.total_cost / self.total_cost_steps))
 
   def memorize(self, deltaj):
     '''
@@ -267,22 +310,21 @@ class Neuron:
     highest_certainty_index = None
     # iterate through the potential of each memory, use the highest certainty
     for (index, memory) in np.ndenumerate(self.memories[:, 0]):
-      if(np.sum(np.power(
-        # waldo -> annealing_steps not used
-        memory[0:self.annealing_steps] - self.active_memory[-self.annealing_steps:],
-        2)) < self.annealing_threshold):
+      if(np.sum(np.power(memory[0:self.annealing_steps] - self.active_memory[-self.annealing_steps:],2)) < self.annealing_threshold):
         certainty = self.get_memory_certainty(index[0])
+        # logging.debug('certainty: {}'.format(certainty))
         if(not self.is_annealed(index[0]) and certainty > highest_certainty):
           highest_certainty = certainty
           highest_certainty_index = index[0]
 
     if(highest_certainty_index is not None):
-      logging.debug('certainty of annealed memory: {}'.format(certainty))
+      # logging.debug('certainty of annealed memory: {}'.format(highest_certainty))
       self.anneal_memory(highest_certainty_index)
 
   def get_memory_certainty(self, index):
     '''
     Calculate the sum certainty of a memory
+
     '''
     memory = self.memories[index]
     return np.sum(np.abs(memory[1] * memory[2]))
@@ -326,7 +368,7 @@ class Neuron:
     '''
     fig, ax = plt.subplots()
     ax.set_xlim([0, self.active_memory_length])
-    ax.set_ylim([0, 4])
+    ax.set_ylim([0, 1])
     fig.canvas.draw()
     background = fig.canvas.copy_from_bbox(ax.bbox)
 

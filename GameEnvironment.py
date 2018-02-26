@@ -255,9 +255,9 @@ class Game:
 class GameEnvironment:
 	def __init__(self):
 		self.game = Game(self.environment_loop)
-		self.neuron = Neuron(timestep=0.10, active_memory_length=4.0, name="player",
+		self.neuron = Neuron(timestep=0.05, active_memory_length=4.0, name="player",
 			plot_potential=False, activate=self.game_neuron, activate_threshold=0.95,
-			annealing_steps=3)
+			annealing_steps=3, cost_function_window=0.20)
 		# self.neuron.init_potential_graph()
 		self.neuron.start()
 
